@@ -1,0 +1,47 @@
+# This workflow will build a .NET project
+
+name: build-test-deploy
+
+on:
+  push:
+  pull_request:
+    branches: [ "master" ]
+    paths-ignore:
+    - 'README.md'
+env:
+  DOTNET_VERSION: '6.0.x'
+  CONFIGURATION: 'Release'
+  
+jobs:
+
+  build-and-test:
+    name: build-and-test    
+    runs-on: ubuntu-latest    
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    - name: Install dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --configuration ${{ env.CONFIGURATION }} --no-restore
+    - name: Test
+      run: dotnet test --no-restore --verbosity normal
+  
+  deploy:
+    name: deploy
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy to VPS ( ${{ secrets.SSH_HOST }} )
+      uses: appleboy/ssh-action@master
+      with:
+        username: ${{ secrets.SSH_USERNAME }}
+        host: ${{ secrets.SSH_HOST }}
+        password: ${{ secrets.SSH_PASSWORD }}
+        script: |
+          cd app/Solarlab.Academy-2023/
+          git pull
+          docker-compose up -d --build
